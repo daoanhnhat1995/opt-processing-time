@@ -51,7 +51,7 @@ func foundNode(node *html.Node, q *Query) bool {
 	return false
 }
 
-func (myApp *Application) parseDoc(node *html.Node, ch chan *Application) {
+func (myApp *Application) ParseDoc(node *html.Node, ch chan *Application) {
 	found := false
 	if node.Type == html.ElementNode {
 		queryStatusParent := &Query{
@@ -94,7 +94,7 @@ func (myApp *Application) parseDoc(node *html.Node, ch chan *Application) {
 		return
 	}
 	for c := node.FirstChild; c != nil; c = c.NextSibling {
-		myApp.parseDoc(c, ch)
+		myApp.ParseDoc(c, ch)
 	}
 }
 
@@ -114,7 +114,7 @@ func main() {
 			}
 			resp, _ := http.Get(ENDPOINT + myApp.Receipt.ToString())
 			doc, _ := html.Parse(resp.Body)
-			myApp.parseDoc(doc, ch)
+			myApp.ParseDoc(doc, ch)
 		}
 		close(ch)
 	}()
