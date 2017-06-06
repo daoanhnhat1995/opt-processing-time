@@ -14,7 +14,7 @@ import (
 
 const (
 	BASEID   int = 1790100000
-	MAXITER  int = 0
+	MAXITER  int = 10
 	ENDPOINT     = "https://egov.uscis.gov/casestatus/mycasestatus.do?appReceiptNum="
 )
 
