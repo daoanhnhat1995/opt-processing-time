@@ -1,26 +1,36 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
+	"encoding/csv"
+	"log"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/net/html"
 )
 
-const endpoint string = "https://egov.uscis.gov/casestatus/mycasestatus.do?appReceiptNum="
+const (
+	BASEID   int = 1790100000
+	MAXITER  int = 0
+	ENDPOINT     = "https://egov.uscis.gov/casestatus/mycasestatus.do?appReceiptNum="
+)
 
 type Receipt struct {
 	AreaCode string
-	Number   uint32
+	Number   string
 }
 
 type Application struct {
 	Receipt Receipt
 	Status  string
-	Date    time.Time
+	Date    string
+}
+
+func (r *Receipt) ToString() string {
+	return r.AreaCode + r.Number
 }
 
 func isTarget(node *html.Node) bool {
@@ -63,7 +73,8 @@ func foundNode(node *html.Node, q *Query) bool {
 	return false
 }
 
-func (myApp *Application) parseDoc(node *html.Node) {
+func (myApp *Application) parseDoc(node *html.Node, ch chan *Application) {
+	found := false
 	if node.Type == html.ElementNode {
 		queryStatusParent := &Query{
 			NodeType: html.ElementNode,
@@ -92,31 +103,58 @@ func (myApp *Application) parseDoc(node *html.Node) {
 						myApp.Status = text
 					} else if i == 2 {
 						ss := strings.SplitAfterN(text, ",", 3)
-						const shortForm = "Jan 2, 2006"
-						rDate, _ := time.Parse(shortForm, ss[0][3:]+strings.Trim(ss[1], ","))
+						rDate := ss[0][3:] + strings.Trim(ss[1], ",")
 						myApp.Date = rDate
 					}
+					found = true
 				}
 			}
 		}
 	}
+	if found {
+		ch <- myApp
+		return
+	}
 	for c := node.FirstChild; c != nil; c = c.NextSibling {
-		myApp.parseDoc(c)
+		myApp.parseDoc(c, ch)
 	}
 }
 
 func main() {
-	// example := "YSC1790219538"
-	// resp, _ := http.Get(endpoint + example)
-	myApp := &Application{
-		Receipt: Receipt{
-			AreaCode: "YSC",
-			Number:   1790219538,
-		},
+	records := [][]string{
+		{"case_id", "case_status", "date"},
 	}
-	file, _ := os.Open("example.html")
-	fileReader := bufio.NewReader(file)
-	doc, _ := html.Parse(fileReader)
-	myApp.parseDoc(doc)
-	fmt.Println(myApp)
+	ch := make(chan *Application)
+	go func() {
+		for id := 0; id <= MAXITER; id++ {
+			nextId := BASEID + int(1000*id)
+			myApp := &Application{
+				Receipt: Receipt{
+					AreaCode: "YSC",
+					Number:   strconv.Itoa(nextId),
+				},
+			}
+			resp, _ := http.Get(ENDPOINT + myApp.Receipt.ToString())
+			doc, _ := html.Parse(resp.Body)
+			myApp.parseDoc(doc, ch)
+		}
+		close(ch)
+	}()
+
+	for a := range ch {
+		records = append(records, []string{a.Receipt.ToString(), a.Status, a.Date})
+	}
+
+	fileName := time.Now().String()
+	csvFile, err := os.Create(fileName + ".csv")
+	if err != nil {
+		log.Fatal("Error open file")
+	}
+
+	defer csvFile.Close()
+	w := csv.NewWriter(csvFile)
+	w.WriteAll(records)
+	if err := w.Error(); err != nil {
+		log.Fatalln("error writing to cvs")
+	}
 }
