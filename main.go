@@ -33,28 +33,6 @@ func (r *Receipt) ToString() string {
 	return r.AreaCode + r.Number
 }
 
-func isTarget(node *html.Node) bool {
-	if node.Type == html.ElementNode && node.Data == "div" {
-		for _, attr := range node.Attr {
-			if attr.Key == "class" && attr.Val == "current-status-sec" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isAppointmentSection(node *html.Node) bool {
-	if node.Type == html.ElementNode && node.Data == "div" {
-		for _, attr := range node.Attr {
-			if attr.Key == "class" && attr.Val == "col-lg-12 appointment-sec center" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 type Query struct {
 	NodeData string
 	NodeType html.NodeType
